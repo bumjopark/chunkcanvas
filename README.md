@@ -14,7 +14,7 @@ result as JSONL, JSON or Markdown for your RAG pipeline.
   for a password when the demo requires one. See [Pictures](#pictures).
 - **License:** MIT (see [Licenses](#licenses) for dependencies)
 
-![Creating a chunk on a public slide, dragging its boundary as the text and token count change, and viewing the chunk in Preview, Text and Blocks.](docs/images/walkthrough.gif)
+![Opening a Korean paper from the sample gallery on the public demo, moving and adding chunk boundaries on the page, and checking a chunk in Preview, Text and Blocks.](docs/images/walkthrough.gif)
 
 <details>
 <summary>Editor and splitter comparison screenshots</summary>

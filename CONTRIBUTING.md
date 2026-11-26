@@ -53,6 +53,20 @@ services/api/.venv/bin/python scripts/gen_splitter_fixtures.py
 
 ## Recording the README walkthrough
 
+The current `docs/images/walkthrough.gif` is a screen recording of the public demo, made in a
+desktop browser with a gallery sample. Crop the browser's own toolbars before converting, so no
+address bar, bookmarks or account picture remain. The GIF was made from a 1910 × 988 recording
+with:
+
+```bash
+ffmpeg -i recording.mp4 -vf "crop=1910:914:0:74,fps=10,scale=1100:-1:flags=lanczos,split[s0][s1];\
+[s0]palettegen=max_colors=192:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle" \
+  -loop 0 docs/images/walkthrough.gif
+```
+
+Adjust the crop to your recording. A scripted recording of a smaller viewport is also
+available:
+
 Build the web app and choose a free loopback port on a separate checkout. From
 `services/api`, run the service launcher with a temporary data directory and a
 gallery containing the public `pptx-ohio-standards` sample. The launcher mounts
