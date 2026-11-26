@@ -61,16 +61,24 @@ the gallery read-only.
 ```bash
 CC_GALLERY_DIR=/absolute/path/to/public-gallery CC_DATA_DIR="$(mktemp -d)" \
 CC_MAX_UPLOAD_MB=64 CC_MAX_PAGES=20 CC_TRUNCATE_LONG_PDFS=true \
-CC_WEB_DIST="$PWD/../../apps/web/dist" CC_API_PWD= CC_OPENAI_API_KEY= \
+CC_WEB_DIST="$PWD/../../apps/web/dist" CC_VLM_OPEN=true CC_API_PWD= \
+CC_OPENAI_BASE_URL=http://127.0.0.1:1/v1 CC_OPENAI_API_KEY=recording-only \
 .venv/bin/python -m app.serve_isolated --port 8465
 ```
 
-Capture only the 1280 × 820 browser viewport in English. Check that the upload area
-shows the 64 MB limit and the cutoff at the first 20 pages. Open **PPTX → Ohio’s New
-Learning Standards**, select its title on the slide, then click the gap below the
-last block on the cover. Check that **Session Objectives** starts chunk 2. Open
-**Export → Chunks (JSONL)** and check the download contains ten records. Save the
-sequence as a looping GIF at `docs/images/walkthrough.gif`.
+With FFmpeg on your path, run these commands from the checkout root in another terminal:
+
+```bash
+npx playwright install chromium
+node scripts/record-walkthrough.mjs http://127.0.0.1:8465
+```
+
+The script records an English 1280 × 820 viewport. It checks the upload limits,
+opens the public slide deck and clicks between two blocks to split a chunk.
+It captures the mouse while dragging the new boundary and checks that both
+the token count and the preview text change before release. It then opens the
+Text and Blocks tabs and writes the looping GIF to `docs/images/walkthrough.gif`.
+The sample already contains its figure descriptions.
 
 ## Ground rules
 

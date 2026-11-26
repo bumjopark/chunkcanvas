@@ -14,7 +14,7 @@ result as JSONL, JSON or Markdown for your RAG pipeline.
   for a password when the demo requires one. See [Pictures](#pictures).
 - **License:** MIT (see [Licenses](#licenses) for dependencies)
 
-![Opening a PowerPoint sample, splitting off its cover on the original slide, and exporting the ten resulting chunks as JSONL.](docs/images/walkthrough.gif)
+![Creating a chunk on a public slide, dragging its boundary as the text and token count change, and viewing the chunk in Preview, Text and Blocks.](docs/images/walkthrough.gif)
 
 <details>
 <summary>Editor and splitter comparison screenshots</summary>
