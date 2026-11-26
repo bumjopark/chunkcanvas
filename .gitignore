@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.tools/node_modules/
+.tools/libreoffice/
+.tools/libreoffice-[0-9]*/
+services/api/.venv/
+services/api/.models/
+data/
+.env
+*.pyc
+__pycache__/
+.pytest_cache/
+test-results/
+playwright-report/
+apps/web/.scratch/
+
+# Real-world test PDFs (may be confidential): never commit.
+examples/
+
+# A site's own sample gallery (scripts/build_samples.py): third-party documents, kept per site.
+gallery/

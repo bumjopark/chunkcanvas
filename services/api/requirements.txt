@@ -1,0 +1,25 @@
+# Direct runtime dependencies. requirements.lock pins the full tree that was tested.
+# Normal installations use requirements.lock; this file declares the runtime roots.
+# To update, use a separate tested environment and run scripts/lock_requirements.py.
+# The generated lock uses official CPU PyTorch artifact URLs, not a shared extra index.
+torch==2.15.0+cpu
+torchvision==0.29.2+cpu
+docling==2.144.0
+PyMuPDF==2.0
+pypdfium2==5.14.0
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+pydantic==2.14.1
+pydantic-settings==2.16.2
+# Other formats: HWP 5.x reading (AGPL-3.0) and Markdown rendering. LibreOffice itself is a
+# separate program (see README); without it only PDFs and images are accepted.
+pyhwp==0.1b15
+markdown-it-py==4.2.0
+# Optional CPU OCR parser (RapidOCR via Docling).
+rapidocr==3.10.0
+onnxruntime==1.31.1
+# Restores word spacing the Korean OCR model drops (Apache-2.0).
+kiwipiepy==0.24.1
+lxml==6.1.3
+httpx==0.28.1
+python-multipart==0.0.32

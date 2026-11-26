@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo",
+    "Malgun Gothic", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, "D2Coding", monospace;
+  --color-accent-50: oklch(0.962 0.018 272.3);
+  --color-accent-100: oklch(0.93 0.034 272.8);
+  --color-accent-200: oklch(0.87 0.065 274);
+  --color-accent-300: oklch(0.785 0.115 274.7);
+  --color-accent-400: oklch(0.673 0.182 276.9);
+  --color-accent-500: oklch(0.585 0.233 277.1);
+  --color-accent-600: oklch(0.511 0.262 276.97);
+  --color-accent-700: oklch(0.457 0.24 277.02);
+  --color-accent-800: oklch(0.398 0.195 277.4);
+  --color-accent-900: oklch(0.359 0.144 278.7);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100;
+  font-size: 14px;
+}
+
+::selection {
+  @apply bg-accent-200 dark:bg-accent-700;
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, currentColor 25%, transparent) transparent;
+}
+
+/* Markdown preview inside the inspector. */
+.md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { @apply mt-3 mb-1.5 font-semibold first:mt-0; }
+.md h1 { @apply text-lg; }
+.md h2 { @apply text-base; }
+.md h3, .md h4, .md h5, .md h6 { @apply text-sm; }
+.md p { @apply my-1.5 leading-relaxed; }
+.md ul, .md ol { @apply my-1.5 pl-5; }
+.md ul { @apply list-disc; }
+.md ol { @apply list-decimal; }
+.md table { @apply my-2 w-full border-collapse text-xs; }
+.md th, .md td { @apply border border-zinc-300 px-1.5 py-1 text-left align-top dark:border-zinc-700; }
+.md th { @apply bg-zinc-100 font-medium dark:bg-zinc-800; }
+.md pre { @apply my-2 overflow-x-auto rounded bg-zinc-100 p-2 font-mono text-xs dark:bg-zinc-800; }

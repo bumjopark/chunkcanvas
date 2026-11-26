@@ -1,0 +1,7 @@
+# Install requirements-build.lock and requirements.lock first (see README).
+# Development tools are installed separately; this is not the runtime hash lock.
+pytest==9.2.0
+httpx==0.28.1
+# Only for scripts/gen_splitter_fixtures.py (LangChain parity fixtures).
+langchain-text-splitters==1.1.3
+tiktoken==0.14.0

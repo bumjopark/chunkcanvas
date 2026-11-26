@@ -1,0 +1,31 @@
+# systemd user unit for an Ubuntu deployment. Installed by
+# scripts/install-service.sh, which replaces @ROOT@ with the repository path.
+[Unit]
+Description=ChunkCanvas web demo on 127.0.0.1:@PORT@
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@ROOT@/services/api
+EnvironmentFile=@ROOT@/.env
+# The manager reads EnvironmentFile before the launcher constructs a new mount/PID namespace.
+ExecStart="@ROOT@/services/api/.venv/bin/python" -B -m app.serve_isolated --port @PORT@
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillMode=mixed
+NoNewPrivileges=true
+UMask=0077
+Nice=5
+# A 30-page hybrid parse peaks around 2.5 GB; the API itself needs ~250 MB.
+# The parser opts into oom_score_adj=1000. Keep serving when a worker is killed.
+OOMPolicy=continue
+MemoryMax=4G
+MemorySwapMax=0
+CPUQuota=400%
+TasksMax=256
+LimitNOFILE=8192
+LimitCORE=0
+
+[Install]
+WantedBy=default.target

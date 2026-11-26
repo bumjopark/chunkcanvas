@@ -1,0 +1,16 @@
+[
+  {
+    "key": "chunking-field-guide",
+    "file": "chunking-field-guide.pdf",
+    "title": "The Chunking Field Guide",
+    "language": "en",
+    "description": "Two-column English guide with headings, lists and a table."
+  },
+  {
+    "key": "chunking-guide-ko",
+    "file": "chunking-guide-ko.pdf",
+    "title": "문서 청킹 운영 가이드",
+    "language": "ko",
+    "description": "Korean single-column guide with numbered steps and a table."
+  }
+]
