@@ -88,9 +88,8 @@ class Settings(BaseSettings):
     formula_seconds: int = 300
     default_parser: Literal["hybrid", "docling", "pymupdf"] = "hybrid"
 
-    # Pictures read by a vision-language model (OpenAI chat completions API), for visitors who
-    # enter vlm_password: each picture region goes out as an image with its caption, and the text
-    # in it plus a description replace its OCR text. Off unless both secrets are set.
+    # Allow password-free opt-in on an individual upload using the operator's provider key.
+    vlm_open: bool = False
     openai_api_key: SecretStr | None = None
     openai_base_url: str = "https://api.openai.com/v1"
     vlm_password: SecretStr | None = Field(None, validation_alias=AliasChoices("CC_VLM_PASSWORD", "CC_API_PWD"))
@@ -126,7 +125,7 @@ class Settings(BaseSettings):
     @property
     def vlm_enabled(self) -> bool:
         return bool(self.openai_api_key and self.openai_api_key.get_secret_value()
-                    and self.vlm_password and self.vlm_password.get_secret_value())
+                    and (self.vlm_open or (self.vlm_password and self.vlm_password.get_secret_value())))
 
     @property
     def documents_dir(self) -> Path:

@@ -1,6 +1,8 @@
 import json
 import time
 
+import pytest
+
 from app import main
 from conftest import auth, upload, wait_done
 from pdfs import blank_pdf, encrypted_pdf, picture_pdf, text_pdf
@@ -344,10 +346,27 @@ def _picture_reading_on(monkeypatch):
     return s
 
 
+@pytest.mark.parametrize(("key", "password", "open_access", "available"), [
+    (None, "example", True, False), ("example", None, False, False),
+    ("example", None, True, True), ("example", "example", False, True), ("example", "example", True, True),
+])
+def test_picture_reading_configuration(client, monkeypatch, key, password, open_access, available):
+    from pydantic import SecretStr
+
+    settings = main.S().settings
+    monkeypatch.setattr(settings, "openai_api_key", SecretStr(key) if key else None)
+    monkeypatch.setattr(settings, "vlm_password", SecretStr(password) if password else None)
+    monkeypatch.setattr(settings, "vlm_open", open_access)
+    assert client.get("/api/config").json()["vlm"] == {
+        "available": available, "model": settings.vlm_model, "open": open_access}
+    if not available:
+        assert client.post("/api/documents", headers={"X-VLM-Read": "true"}, content=text_pdf()).status_code == 422
+
+
 def test_picture_reading_needs_the_password(client, monkeypatch):
     assert client.get("/api/config").json()["vlm"]["available"] is False
     _picture_reading_on(monkeypatch)
-    assert client.get("/api/config").json()["vlm"] == {"available": True, "model": "gpt-6-luna"}
+    assert client.get("/api/config").json()["vlm"] == {"available": True, "open": False, "model": "gpt-6-luna"}
     assert client.post("/api/vlm/unlock", json={"password": "nope"}).json()["detail"]["code"] == "vlm_password"
     assert client.post("/api/vlm/unlock", json={"password": "open sesame"}).json()["ok"] is True
     res = client.post("/api/documents", content=text_pdf(),
@@ -359,22 +378,49 @@ def test_picture_reading_needs_the_password(client, monkeypatch):
     assert client.post("/api/vlm/unlock", json={"password": "open sesame"}).status_code == 429
 
 
-def test_unlocked_uploads_have_their_pictures_read(client, monkeypatch):
-    import httpx
-    from app import vlm
+@pytest.fixture
+def picture_provider():
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
 
-    s = _picture_reading_on(monkeypatch)
     sent = []
 
-    async def handle(req):
-        sent.append((str(req.url), req.headers.get("Authorization"), json.loads(req.content)))
-        answer = {"choices": [{"message": {"content": "Text in the figure: Q3\n\nDescription: A red square."}}]}
-        return httpx.Response(200, json=answer)
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            body = self.rfile.read(int(self.headers["Content-Length"]))
+            sent.append((self.path, self.headers.get("Authorization"), json.loads(body)))
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            answer = {"choices": [{"message": {"content": "Text in the figure: Q3\n\nDescription: A red square."}}]}
+            self.wfile.write(json.dumps(answer).encode())
 
-    client_type = httpx.AsyncClient
-    monkeypatch.setattr(vlm.httpx, "AsyncClient", lambda **kw: client_type(transport=httpx.MockTransport(handle), **kw))
+        def log_message(self, *_args):
+            pass
+
+    with ThreadingHTTPServer(("127.0.0.1", 0), Handler) as server:
+        worker = Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        try:
+            yield f"http://127.0.0.1:{server.server_port}/v1", sent
+        finally:
+            server.shutdown()
+            worker.join()
+
+
+@pytest.mark.parametrize("access", ["password", "open", "password-on-open-server"])
+def test_unlocked_uploads_have_their_pictures_read(client, monkeypatch, picture_provider, access):
+    s = _picture_reading_on(monkeypatch)
+    endpoint, sent = picture_provider
+    monkeypatch.setattr(s.settings, "openai_base_url", endpoint)
+    monkeypatch.setattr(s.settings, "vlm_open", access != "password")
+    if access == "open":
+        monkeypatch.setattr(s.settings, "vlm_password", None)
+    opt_in = {"X-VLM-Read": "true"} if access == "open" else {"X-VLM-Password": "open sesame"}
+    assert client.get("/api/config").json()["vlm"] == {
+        "available": True, "open": access != "password", "model": "gpt-6-luna"}
     body = client.post("/api/documents?parser=pymupdf", content=picture_pdf(),
-                       headers={"Content-Type": "application/pdf", "X-Filename": "p.pdf", "X-VLM-Password": "open sesame"}).json()
+                       headers={"Content-Type": "application/pdf", "X-Filename": "p.pdf", **opt_in}).json()
     st = wait_done(client, body["id"], body["accessToken"])
     assert st["status"] == "completed" and "vlm_figures" in st["notices"]
     doc = client.get(f"/api/documents/{body['id']}", headers=auth(body["accessToken"])).json()["parsed"]
@@ -385,28 +431,34 @@ def test_unlocked_uploads_have_their_pictures_read(client, monkeypatch):
     assert url.endswith("/chat/completions") and authorization == "Bearer test-key"
     image = payload["messages"][1]["content"][1]["image_url"]["url"]
     assert image.startswith("data:image/png;base64,") and payload["model"] == "gpt-6-luna"
-    # Without the password nothing is sent.
+    # No selection on the next upload must produce zero additional model calls.
     plain = upload(client, picture_pdf()).json()
-    wait_done(client, plain["id"], plain["accessToken"])
+    assert wait_done(client, plain["id"], plain["accessToken"])["status"] == "completed"
     assert len(sent) == 1
+    if access == "open":
+        from pydantic import SecretStr
+        monkeypatch.setattr(s.settings, "vlm_password", SecretStr("open sesame"))
+        monkeypatch.setattr(s.settings, "vlm_open", False)
+        assert client.post("/api/documents", headers=opt_in, content=picture_pdf()).status_code == 403
+        assert client.post(f"/api/documents/{body['id']}/parse?parser=pymupdf",
+                           headers=auth(body["accessToken"])).status_code == 200
+        st = wait_done(client, body["id"], body["accessToken"])
+        assert st["status"] == "completed" and "vlm_figures" not in st["notices"] and len(sent) == 1
 
 
-def test_picture_reading_stops_at_an_optional_daily_allowance(client, monkeypatch):
-    import httpx
-    from app import vlm
+@pytest.mark.parametrize("open_access", [False, True])
+def test_picture_reading_stops_at_an_optional_daily_allowance(client, monkeypatch, picture_provider, open_access):
     import datetime
 
     s = _picture_reading_on(monkeypatch)
     monkeypatch.setattr(s.settings, "vlm_daily_images", 1)
     (s.settings.data_dir / "vlm-usage.json").write_text(json.dumps({datetime.date.today().isoformat(): 1}))
-    sent = []
-    async def handle(req):
-        sent.append(req)
-        return httpx.Response(500)
-    client_type = httpx.AsyncClient
-    monkeypatch.setattr(vlm.httpx, "AsyncClient", lambda **kw: client_type(transport=httpx.MockTransport(handle), **kw))
+    endpoint, sent = picture_provider
+    monkeypatch.setattr(s.settings, "openai_base_url", endpoint)
+    monkeypatch.setattr(s.settings, "vlm_open", open_access)
+    opt_in = {"X-VLM-Read": "true"} if open_access else {"X-VLM-Password": "open sesame"}
     body = client.post("/api/documents?parser=pymupdf", content=picture_pdf(),
-                       headers={"Content-Type": "application/pdf", "X-Filename": "p.pdf", "X-VLM-Password": "open sesame"}).json()
+                       headers={"Content-Type": "application/pdf", "X-Filename": "p.pdf", **opt_in}).json()
     st = wait_done(client, body["id"], body["accessToken"])
     assert st["status"] == "completed" and "vlm_partial" in st["notices"] and "vlm_figures" not in st["notices"]
     assert sent == []

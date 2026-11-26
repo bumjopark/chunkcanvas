@@ -37,6 +37,12 @@ npm run build && (cd apps/web && npx playwright install chromium && npx playwrig
 ```
 
 The Playwright suite starts its own API on port 8398 with a throwaway data directory.
+It exercises password access by default. To exercise the per-upload choice on an open
+server, run this additional test from `apps/web`:
+
+```bash
+CC_VLM_OPEN=true npx playwright test --grep 'open AI picture reading'
+```
 
 The LangChain parity fixtures in `packages/core/test/fixtures` come from the real library:
 

@@ -10,8 +10,8 @@ result as JSONL, JSON or Markdown for your RAG pipeline.
 
 - **[Open the public demo](https://chunkcanvas.coco-ai.shop)** to edit and export without signing up.
   Longer PDFs are limited to their first 20 pages. Uploads expire after one hour.
-  Optional AI picture reading requires a password that is not published. On your own
-  installation, set your provider key and choose your own password. See [Pictures](#pictures).
+  AI picture reading is optional. The upload page shows how to turn it on and asks
+  for a password when the demo requires one. See [Pictures](#pictures).
 - **License:** MIT (see [Licenses](#licenses) for dependencies)
 
 ![Opening a PowerPoint sample, splitting off its cover on the original slide, and exporting the ten resulting chunks as JSONL.](docs/images/walkthrough.gif)
@@ -160,7 +160,8 @@ documents each one. The most important:
 | `CC_OCR_ENABLED` | `true` | Offer the CPU OCR parser when its models are installed |
 | `CC_OCR_PICTURES` | `true` | Hybrid parser also OCRs pictures in digital documents (screenshots, image slides); up to several times slower on image-heavy decks |
 | `CC_FORMULA_SECONDS` | `300` | Time per document for reading display formulas as LaTeX (pix2text-mfr, ~1–2 s each); `0` keeps text-layer math |
-| `CC_OPENAI_API_KEY` / `CC_API_PWD` | – | Optional AI picture reading: offered on the upload page to visitors who enter the password (see [Pictures](#pictures)) |
+| `CC_OPENAI_API_KEY` / `CC_API_PWD` | – | Provider key and optional visitor password for [AI picture reading](#pictures) |
+| `CC_VLM_OPEN` | `false` | Allow any visitor to opt in for an individual upload using the operator’s provider key |
 | `CC_VLM_MODEL` / `CC_VLM_REASONING_EFFORT` | `gpt-6-luna` / `low` | Vision model for picture reading (OpenAI chat completions; `CC_OPENAI_BASE_URL` for compatible servers) |
 | `CC_VLM_MAX_FIGURES` / `CC_VLM_SECONDS` / `CC_VLM_CONCURRENCY` | `80` / `300` / `8` | Pictures per document, time per document, requests at once |
 | `CC_VLM_DAILY_IMAGES` | `0` | Optional ceiling on pictures whose first request starts, all visitors together (`0`: none). Queued or unreadable crops consume no allowance; started requests are not refunded. |
@@ -237,10 +238,17 @@ Text drawn in pictures (diagram labels, chart titles, OCR of screenshots and sca
 part of the picture block, without what only adds noise: reference numerals and tick marks,
 lines the caption already repeats, and leftovers of fewer than three words.
 
-OCR only gives a picture scattered words. With `CC_OPENAI_API_KEY` and `CC_API_PWD` set, the upload
-page offers **AI picture reading** to visitors who enter the password: each picture region (up to
-`CC_VLM_MAX_FIGURES`) is sent as an image with its caption and part of the immediately preceding
-paragraph to the configured model provider. The vision model (`gpt-6-luna` by default) returns the text in the picture and what it shows
+**AI picture reading** requires a provider key (`CC_OPENAI_API_KEY`). By default, set
+`CC_API_PWD` to offer password access. With `CC_VLM_OPEN=true`, any visitor can opt in for
+an individual upload. The choice starts off for each file. You can keep the password
+configured and return to password access by setting `CC_VLM_OPEN=false` and restarting
+the service.
+
+Enabling picture reading sends each selected picture region (up to `CC_VLM_MAX_FIGURES`),
+its caption and part of the immediately preceding paragraph to the configured model
+provider. The operator pays for every visitor who opts in. Set a positive
+`CC_VLM_DAILY_IMAGES` to cap daily images across visitors and set a spending or usage
+limit at the provider. The vision model (`gpt-6-luna` by default) returns the text in the picture and what it shows
 (chart axes, values and trends; how a diagram's parts connect). That answer becomes the picture's
 text, marked `[Figure description]` (in the document's language) in chunks. On 111 hard pictures
 from papers, patents and decks it took about 5 s each at `low` reasoning effort, roughly 0.04 ¢

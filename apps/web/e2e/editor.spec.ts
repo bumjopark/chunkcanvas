@@ -412,6 +412,38 @@ test('AI picture reading is unlocked with the password and stays on for the tab'
   await expect(page.locator('[data-chunk-row]').first()).toBeVisible({ timeout: 180_000 });
 });
 
+test('open AI picture reading requires a fresh choice for each upload', async ({ page, request }) => {
+  const { vlm } = await (await request.get('/api/config')).json();
+  test.skip(!vlm?.available || !vlm.open, 'run with CC_VLM_OPEN=true');
+  // A prior password session must not silently opt the visitor into open access.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.setItem('chunkcanvas.vlmPassword', 'unused-old-password'));
+  await page.reload();
+  for (const [lang, label, disclosure] of [
+    ['ko', '다음에 올릴 파일에 AI 그림 읽기 사용', '그림 바로 앞 문단의 일부'],
+    ['en', 'Use AI picture reading for the next upload', 'the paragraph immediately before it'],
+  ]) {
+    await page.evaluate(value => localStorage.setItem('chunkcanvas.lang', value), lang);
+    await page.reload();
+    await expect(page.getByText(disclosure, { exact: false })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: new RegExp(label) })).not.toBeChecked();
+    await expect(page.getByTestId('vlm-password')).toHaveCount(0);
+  }
+  for (const enable of [true, false]) {
+    const toggle = page.getByRole('checkbox', { name: /AI picture reading/ });
+    await expect(toggle).not.toBeChecked();
+    await toggle.check();
+    if (!enable) await toggle.uncheck();
+    const posted = page.waitForRequest(req => req.method() === 'POST' && req.url().includes('/api/documents?'));
+    await page.getByTestId('file-input').setInputFiles(samplePdf);
+    const headers = (await posted).headers();
+    expect(headers['x-vlm-read']).toBe(enable ? 'true' : undefined);
+    expect(headers['x-vlm-password']).toBeUndefined();
+    await expect(page.locator('[data-chunk-row]').first()).toBeVisible({ timeout: 180_000 });
+    await page.goto('/');
+  }
+});
+
 test('gallery samples open at once, grouped by file type', async ({ page }) => {
   await page.goto('/');
   const hwpx = page.locator('[data-sample-group="hwpx"]');

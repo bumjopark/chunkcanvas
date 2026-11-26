@@ -19,8 +19,7 @@ export interface AppConfig {
   /** Accepted upload formats and their file extensions. */
   formats: string[];
   extensions: string[];
-  /** Picture reading by a vision-language model, for visitors with the password. */
-  vlm?: { available: boolean; model: string };
+  vlm?: { available: boolean; open?: boolean; model: string };
 }
 
 export interface Sample {
@@ -98,14 +97,15 @@ export const api = {
       `/api/samples/${encodeURIComponent(key)}/documents?parser=${encodeURIComponent(parser)}`,
       { method: 'POST' },
     ),
-  upload: (file: File, parser: string, vlmPassword?: string | null) =>
+  upload: (file: File, parser: string, pictureReading?: true | string | null) =>
     request<StatusPayload & { accessToken: string }>(`/api/documents?parser=${encodeURIComponent(parser)}`, {
       method: 'POST',
       body: file,
       headers: {
         'Content-Type': file.type || 'application/octet-stream',
         'X-Filename': encodeURIComponent(file.name),
-        ...(vlmPassword ? { 'X-VLM-Password': vlmPassword } : {}),
+        ...(pictureReading === true ? { 'X-VLM-Read': 'true' }
+          : pictureReading ? { 'X-VLM-Password': pictureReading } : {}),
       },
     }),
   vlmUnlock: (password: string) =>

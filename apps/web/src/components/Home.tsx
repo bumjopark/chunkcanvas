@@ -16,7 +16,10 @@ export function Home({ config, samples, navigate }: { config: AppConfig; samples
   const input = useRef<HTMLInputElement>(null);
   const [recent, setRecent] = useState(docs.list);
   const ttl = formatDuration(lang, config.limits.documentTtlSeconds);
-  const [vlmPassword, setVlmPassword] = useState<string | null>(() => (config.vlm?.available ? savedVlmPassword() : null));
+  const openReading = config.vlm?.available && config.vlm.open;
+  const [readThisFile, setReadThisFile] = useState(false);
+  const [vlmPassword, setVlmPassword] = useState<string | null>(() =>
+    config.vlm?.available && !config.vlm.open ? savedVlmPassword() : null);
 
   const start = async (work: () => ReturnType<typeof api.upload>, label: string) => {
     setBusy(label);
@@ -37,7 +40,9 @@ export function Home({ config, samples, navigate }: { config: AppConfig; samples
       setError(`${file.name}: > ${config.limits.maxUploadMb} MB`);
       return;
     }
-    void start(() => api.upload(file, parser, vlmPassword), 'upload');
+    const reading = openReading ? readThisFile || null : vlmPassword;
+    setReadThisFile(false);
+    void start(() => api.upload(file, parser, reading), 'upload');
   };
 
   return (
@@ -127,14 +132,25 @@ export function Home({ config, samples, navigate }: { config: AppConfig; samples
               {t('autoPipeline')}
             </p>
 
-            {config.vlm?.available && (
+            {config.vlm?.available && !openReading && (
               <VlmUnlock model={config.vlm.model} password={vlmPassword} onChange={setVlmPassword} />
             )}
 
             <p className="mt-5 flex items-start gap-2 text-[13px] text-zinc-500">
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
-              {t(config.vlm?.available ? 'vlmPrivacy' : 'privacy', { ttl })}
+              <span id="upload-privacy">{t(config.vlm?.available ? 'vlmPrivacy' : 'privacy', { ttl })}</span>
             </p>
+            {openReading && config.vlm && (
+              <label className="mt-3 flex items-center gap-2 text-[13px] font-medium">
+                <input
+                  type="checkbox"
+                  aria-describedby="upload-privacy"
+                  checked={readThisFile}
+                  onChange={(e) => setReadThisFile(e.target.checked)}
+                />
+                {t('vlmThisFile', { model: config.vlm.model })}
+              </label>
+            )}
           </div>
 
           <aside className="space-y-6">

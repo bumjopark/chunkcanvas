@@ -515,21 +515,31 @@ def health() -> dict:
     return {"ok": True, "version": __version__}
 
 
-def vlm_unlocked(request: Request, key: str, password: str | None = None) -> bool:
-    """True when the request carries the picture-reading password (header X-VLM-Password)."""
+def check_vlm_password(key: str, password: str) -> None:
     s = S()
-    given = password if password is not None else request.headers.get("x-vlm-password")
-    if not given:
-        return False
-    if not s.settings.vlm_enabled:
+    if not s.settings.vlm_enabled or not s.settings.vlm_password:
         raise error(422, "vlm_unavailable", "Picture reading is not available on this server.")
     if s.vlm_failures.full(key):
         raise error(429, "vlm_locked", "Too many wrong passwords. Please try again later.",
                     retryAfter=s.vlm_failures.retry_after(key))
-    if hmac.compare_digest(given.encode(), s.settings.vlm_password.get_secret_value().encode()):
-        return True
+    if hmac.compare_digest(password.encode(), s.settings.vlm_password.get_secret_value().encode()):
+        return
     s.vlm_failures.allow(key)
     raise error(403, "vlm_password", "The password for picture reading is wrong.")
+
+
+def picture_reading_access(request: Request, key: str) -> str | None:
+    if password := request.headers.get("x-vlm-password"):
+        check_vlm_password(key, password)
+        return "password"
+    if request.headers.get("x-vlm-read") != "true":
+        return None
+    settings = S().settings
+    if not settings.vlm_enabled:
+        raise error(422, "vlm_unavailable", "Picture reading is not available on this server.")
+    if not settings.vlm_open:
+        raise error(403, "vlm_password", "Picture reading requires a password.")
+    return "open"
 
 
 class VlmUnlock(BaseModel):
@@ -543,7 +553,7 @@ async def vlm_unlock(request: Request) -> dict:
         body = VlmUnlock.model_validate_json(await limited_body(request, 8192))
     except ValidationError:
         raise error(422, "invalid_request", "A password is required.") from None
-    vlm_unlocked(request, S().client_key(request), body.password or "")
+    check_vlm_password(S().client_key(request), body.password)
     return {"ok": True, "model": S().settings.vlm_model}
 
 
@@ -577,7 +587,7 @@ def config() -> dict:
         "repoUrl": s.settings.repo_url,
         "formats": sorted(capabilities.accepted_formats(s.settings)),
         "extensions": sorted({e for f in capabilities.accepted_formats(s.settings) for e in EXTENSIONS[f]}),
-        "vlm": {"available": s.settings.vlm_enabled, "model": s.settings.vlm_model},
+        "vlm": {"available": s.settings.vlm_enabled, "open": s.settings.vlm_open, "model": s.settings.vlm_model},
     }
 
 
@@ -636,7 +646,7 @@ async def upload(request: Request, parser: str | None = None) -> dict:
         # same total deadline. A tiny trickle cannot retain its slot for 120s.
         transfer_seconds = max(1., s.settings.upload_timeout_seconds - s.settings.upload_grace_seconds)
         minimum_rate = max(minimum_rate, int(int(declared) / transfer_seconds) + 1)
-    vlm = vlm_unlocked(request, key)
+    vlm = picture_reading_access(request, key)
     if s.uploads.full(key):
         raise error(429, "upload_rate_limited", "Upload limit reached. Please try again later.",
                     retryAfter=s.uploads.retry_after(key))
@@ -657,7 +667,7 @@ async def upload(request: Request, parser: str | None = None) -> dict:
     try:
         doc_dir.mkdir()
         if vlm:
-            (doc_dir / "vlm.json").write_text(json.dumps({"model": s.settings.vlm_model}))
+            (doc_dir / "vlm.json").write_text(json.dumps({"model": s.settings.vlm_model, "access": vlm}))
         with open(received, "wb") as f:
             async with asyncio.timeout(s.settings.upload_timeout_seconds):
                 async for chunk in idle_limited_stream(request, s.settings.upload_idle_seconds,
@@ -886,7 +896,11 @@ async def reparse(doc_id: str, request: Request, parser: str) -> dict:
     if cached:
         cached["document"]["id"] = doc_id
         s.storage.write_json(doc_id, "parsed.json", cached)
-    s.db.update(doc_id, parser=parser, status="completed" if cached else "queued", error_code=None,
+    notices = row.notice
+    if not row.sample_key:
+        # Picture descriptions belong to the previous parse. The worker reports its own result.
+        notices = ",".join(n for n in (notices or "").split(",") if n and n not in {"vlm_figures", "vlm_partial"})
+    s.db.update(doc_id, parser=parser, status="completed" if cached else "queued", notice=notices, error_code=None,
                 error_message=None, created_at=time.time(), started_at=None, finished_at=None, interrupted_retries=0)
     if not cached:
         s.runner.wake()

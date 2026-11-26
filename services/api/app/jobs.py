@@ -227,8 +227,11 @@ class JobRunner:
         args = ["--doc-dir", str(doc_dir), "--parser", parser, "--models", str(self.settings.models_dir.resolve()),
                 "--threads", str(self.settings.parser_threads), "--table-mode", self.settings.table_mode,
                 "--formula-seconds", str(self.settings.formula_seconds)]
-        # Visitors who entered the picture-reading password: cut pictures out for the model step.
-        vlm = self.settings.vlm_enabled and self.storage.read_json(doc_id, "vlm.json") is not None
+        # Older markers were written only after a valid password. Password-free jobs
+        # (including reparses) may use the provider only while open access is enabled.
+        consent = self.storage.read_json(doc_id, "vlm.json")
+        vlm = (self.settings.vlm_enabled and consent is not None
+               and (self.settings.vlm_open or consent.get("access") != "open"))
         if vlm:
             args += ["--figures", str(self.settings.vlm_max_figures)]
         row = self.db.get(doc_id)

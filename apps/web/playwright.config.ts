@@ -41,6 +41,7 @@ export default defineConfig({
           CC_REPO_URL: 'https://example.com/chunkcanvas',
           // Picture reading is offered; no test sends a picture, so the key is never used.
           CC_OPENAI_API_KEY: 'e2e-unused',
+          CC_OPENAI_BASE_URL: 'http://127.0.0.1:1/v1',
           CC_API_PWD: 'e2e-pass',
         },
       },
